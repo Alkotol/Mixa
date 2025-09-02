@@ -1,76 +1,69 @@
 import json
+import os
 import requests
 from flask import Flask, request, jsonify
-import os
 from datetime import datetime
 
 app = Flask(__name__)
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-GIST_ID = os.getenv("GIST_ID")
-GIST_FILENAME = "mixa_memories.json"
-GIST_API_URL = f"https://api.github.com/gists/{GIST_ID}"
-HEADERS = {
-    "Authorization": f"token {GITHUB_TOKEN}",
-    "Accept": "application/vnd.github.v3+json"
-}
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+GIST_ID = os.environ.get("GIST_ID")
+GIST_FILENAME = "memories.json"  # File inside the Gist to update
 
-def load_memories_from_gist():
-    res = requests.get(GIST_API_URL, headers=HEADERS)
-    res.raise_for_status()
-    gist_data = res.json()
-    content = gist_data["files"][GIST_FILENAME]["content"]
-    return json.loads(content)
 
-def save_memories_to_gist(memories):
-    updated_content = json.dumps(memories, indent=2, ensure_ascii=False)
-    payload = {
+def get_gist_content():
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    response = requests.get(f"https://api.github.com/gists/{GIST_ID}", headers=headers)
+    if response.status_code == 200:
+        gist_data = response.json()
+        content = gist_data["files"][GIST_FILENAME]["content"]
+        return json.loads(content)
+    else:
+        return []
+
+
+def update_gist_content(memories):
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    data = {
         "files": {
             GIST_FILENAME: {
-                "content": updated_content
+                "content": json.dumps(memories, indent=2, ensure_ascii=False)
             }
         }
     }
-    res = requests.patch(GIST_API_URL, headers=HEADERS, data=json.dumps(payload))
-    res.raise_for_status()
+    response = requests.patch(
+        f"https://api.github.com/gists/{GIST_ID}",
+        headers=headers,
+        data=json.dumps(data)
+    )
+    return response.status_code == 200
 
-@app.route('/memories', methods=['GET'])
-def get_memories():
-    try:
-        memories = load_memories_from_gist()
-        return jsonify(memories)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
-@app.route('/memories', methods=['POST'])
-def add_memory():
-    data = request.get_json()
-    if not data or 'summary' not in data:
-        return jsonify({'error': 'Missing summary'}), 400
+@app.route("/memories", methods=["POST"])
+def save_memory():
+    new_memory = request.get_json()
+    if not new_memory or "summary" not in new_memory:
+        return jsonify({"error": "Missing memory summary."}), 400
 
-    try:
-        memories = load_memories_from_gist()
-    except:
-        memories = []
-
-    new_memory = {
-        "id": str(len(memories) + 1),
-        "summary": data['summary'],
-        "tags": data.get("tags", []),
-        "timestamp": datetime.utcnow().isoformat() + "Z"
-    }
+    memories = get_gist_content()
+    new_id = str(len(memories) + 1)
+    new_memory["id"] = new_id
+    new_memory["timestamp"] = datetime.utcnow().isoformat() + "Z"
 
     memories.append(new_memory)
+    success = update_gist_content(memories)
+    if success:
+        return jsonify(new_memory), 201
+    else:
+        return jsonify({"error": "Failed to update GitHub Gist."}), 500
 
-    try:
-        save_memories_to_gist(memories)
-    except Exception as e:
-        return jsonify({"error": f"Failed to save memory: {str(e)}"}), 500
 
-    return jsonify({"message": "Memory saved successfully", "memory": new_memory}), 201
+@app.route("/memories", methods=["GET"])
+def get_memories():
+    return jsonify(get_gist_content())
 
-@app.route('/')
-def home():
-    return "Mixa's Gist-powered memory server is running 💾", 200
 
 
