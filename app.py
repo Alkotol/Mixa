@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GIST_ID = os.environ.get("GIST_ID")
-GIST_FILENAME = "memories.json"  # File inside the Gist to update
+GIST_FILENAME = "mixa_memories.json"  # File inside the Gist to update
 
 
 def get_gist_content():
@@ -67,7 +67,7 @@ def get_memories():
 
 def load_memories():
     try:
-        with open("memories.json", "r", encoding="utf-8") as f:
+        with open("mixa_memories.json", "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
         return []
