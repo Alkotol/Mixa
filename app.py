@@ -65,6 +65,15 @@ def save_memory():
 def get_memories():
     return jsonify(get_gist_content())
 
+def load_memories():
+    try:
+        with open("memories.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+    except json.JSONDecodeError:
+        return []
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
 
