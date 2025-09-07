@@ -82,6 +82,7 @@ def list_memories():
 # Get a specific memory by ID
 @app.route("/memories/<memory_id>", methods=["GET"])
 def read_memory_by_id(memory_id):
+    print(f"Requested memory ID: {memory_id}")  # <-- Add this:
     memories = get_gist_content()
     for memory in memories:
         if memory.get("id") == memory_id:
