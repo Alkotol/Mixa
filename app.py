@@ -11,6 +11,7 @@ GIST_ID = os.environ.get("GIST_ID")
 GIST_FILENAME = "mixa_memories.json"  # File inside the Gist to update
 
 
+# Load all memories from the GitHub Gist
 def get_gist_content():
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     response = requests.get(f"https://api.github.com/gists/{GIST_ID}", headers=headers)
@@ -22,6 +23,7 @@ def get_gist_content():
         return []
 
 
+# Update the Gist file with new memory content
 def update_gist_content(memories):
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
@@ -42,6 +44,7 @@ def update_gist_content(memories):
     return response.status_code == 200
 
 
+# Save a new memory to the Gist
 @app.route("/memories", methods=["POST"])
 def save_memory():
     new_memory = request.get_json()
@@ -61,10 +64,26 @@ def save_memory():
         return jsonify({"error": "Failed to update GitHub Gist."}), 500
 
 
+# List all memories
 @app.route("/memories", methods=["GET"])
 def get_memories():
     return jsonify(get_gist_content())
 
+
+# Get a memory by its ID
+@app.route("/memories/<id>", methods=["GET"])
+def get_memory_by_id(id):
+    try:
+        memories = get_gist_content()
+        for memory in memories:
+            if memory["id"] == id:
+                return jsonify(memory), 200
+        return jsonify({"error": "Memory not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# Optional fallback: local file loading (not used in production)
 def load_memories():
     try:
         with open("mixa_memories.json", "r", encoding="utf-8") as f:
@@ -74,7 +93,9 @@ def load_memories():
     except json.JSONDecodeError:
         return []
 
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
 
 
