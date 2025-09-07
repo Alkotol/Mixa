@@ -8,22 +8,28 @@ app = Flask(__name__)
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GIST_ID = os.environ.get("GIST_ID")
-GIST_FILENAME = "mixa_memories.json"  # File inside the Gist to update
+GIST_FILENAME = "mixa_memories.json"
 
 
-# Load all memories from the GitHub Gist
+# Load memory list from GitHub Gist
 def get_gist_content():
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    response = requests.get(f"https://api.github.com/gists/{GIST_ID}", headers=headers)
+    url = f"https://api.github.com/gists/{GIST_ID}"
+    response = requests.get(url, headers=headers)
+
     if response.status_code == 200:
         gist_data = response.json()
-        content = gist_data["files"][GIST_FILENAME]["content"]
-        return json.loads(content)
-    else:
-        return []
+        files = gist_data.get("files", {})
+        if GIST_FILENAME in files:
+            file_content = files[GIST_FILENAME]["content"]
+            try:
+                return json.loads(file_content)
+            except json.JSONDecodeError:
+                return []
+    return []
 
 
-# Update the Gist file with new memory content
+# Update the Gist with new memory list
 def update_gist_content(memories):
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
@@ -44,7 +50,7 @@ def update_gist_content(memories):
     return response.status_code == 200
 
 
-# Save a new memory to the Gist
+# Save a new memory
 @app.route("/memories", methods=["POST"])
 def save_memory():
     new_memory = request.get_json()
@@ -59,43 +65,34 @@ def save_memory():
     memories.append(new_memory)
     success = update_gist_content(memories)
     if success:
-        return jsonify(new_memory), 201
+        return jsonify({
+            "message": "Memory saved successfully",
+            "memory": new_memory
+        }), 201
     else:
-        return jsonify({"error": "Failed to update GitHub Gist."}), 500
+        return jsonify({"error": "Failed to update memory file."}), 500
 
 
-# List all memories
+# List all saved memories
 @app.route("/memories", methods=["GET"])
-def get_memories():
+def list_memories():
     return jsonify(get_gist_content())
 
 
-# Get a memory by its ID
-@app.route("/memories/<id>", methods=["GET"])
-def get_memory_by_id(id):
-    try:
-        memories = get_gist_content()
-        for memory in memories:
-            if memory["id"] == id:
-                return jsonify(memory), 200
-        return jsonify({"error": "Memory not found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# Get a specific memory by ID
+@app.route("/memories/<memory_id>", methods=["GET"])
+def read_memory_by_id(memory_id):
+    memories = get_gist_content()
+    for memory in memories:
+        if memory.get("id") == memory_id:
+            return jsonify(memory)
+    return jsonify({"error": "Memory not found"}), 404
 
 
-# Optional fallback: local file loading (not used in production)
-def load_memories():
-    try:
-        with open("mixa_memories.json", "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
-    except json.JSONDecodeError:
-        return []
-
-
+# Server entry point
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
 
 
 
